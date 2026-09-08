@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Project moved to the `netasservice` GitHub organization.** All repository, issue
+  and wiki links now point at `github.com/netasservice/nettopo`.
+
 ## [0.9.1] - 2026-08-20
 
 ### Fixed

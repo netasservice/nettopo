@@ -42,8 +42,8 @@ dev = [
 nettopo = "nettopo.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/netcraftworks/nettopo"
-Issues = "https://github.com/netcraftworks/nettopo/issues"
+Homepage = "https://github.com/netasservice/nettopo"
+Issues = "https://github.com/netasservice/nettopo/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
