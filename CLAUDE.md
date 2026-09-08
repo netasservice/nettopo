@@ -13,7 +13,7 @@ same commit** as the code change. A PR that changes behavior without a documenta
 is incomplete.
 
 The full command reference lives in the
-[GitHub wiki](https://github.com/netcraftworks/nettopo/wiki), which is a separate
+[GitHub wiki](https://github.com/netasservice/nettopo/wiki), which is a separate
 repository and cannot be part of the same commit. Instead: a PR that changes the CLI
 surface must **list the required wiki edits in its description**, and those edits are
 applied when the PR merges. The README keeps only the essentials (what the project is,
