@@ -76,9 +76,9 @@ so a device that was never reached is as visible as one that was collected:
 
 ```
 target,hostname,status,platform,commands,capture_file,detail
-core-sw1,core-sw1,ok,cisco_ios,10,/home/you/configs/core-sw1.txt,
-core-sw2,core-sw2,ok,cisco_ios,10,/home/you/configs/core-sw2.txt,
-10.0.20.7,acc-sw2,ok,cisco_nxos,9,/home/you/configs/acc-sw2.txt,
+core-sw1,core-sw1,ok,cisco_ios,14,/home/you/configs/core-sw1.txt,
+core-sw2,core-sw2,ok,cisco_ios,14,/home/you/configs/core-sw2.txt,
+10.0.20.7,acc-sw2,ok,cisco_nxos,13,/home/you/configs/acc-sw2.txt,
 rtr-edge.example.net,,failed,,0,,NetmikoAuthenticationException: Authentication to device failed
 ```
 
@@ -88,12 +88,19 @@ for the file format). `all` then writes the complete output tree:
 
 ```
 output/
-├── csv/          devices, interfaces, neighbors, vlans, stp, hsrp, bgp
+├── csv/          devices, interfaces, neighbors, vlans, stp, hsrp, bgp, ports
 ├── l2/           l2_full.drawio, l2_full_port-channels.drawio, l2_network-only.drawio
 ├── stp/          one diagram per VLAN
 ├── hsrp/         one diagram per VLAN
 └── bgp/          bgp.drawio
 ```
+
+`ports.csv` answers "what is plugged into each port": every interface with its state,
+description, speed/duplex, the MACs it learned, the VLAN and IP of each one (the IP comes
+from the ARP table of whichever captured device holds it), and the CDP/LLDP neighbor.
+Uplinks show only their neighbor, so each endpoint appears once, on its access port. It
+needs `show mac address-table`, `show ip arp` and `show interfaces status`/`description`
+in the captures; `collect` gathers all of them.
 
 ## Commands
 

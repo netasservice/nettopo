@@ -11,6 +11,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from pathlib import Path
 
+from nettopo.export.port_table import PORT_TABLE_HEADER, build_port_rows
 from nettopo.model.entities import NetworkModel, StpPort
 
 # OWASP A03: a cell value parsed from device data (e.g. a hostname) that happens to
@@ -58,6 +59,7 @@ def write_csv_tables(model: NetworkModel, output_root: Path) -> Path:
     _write_stp(csv_dir / "stp.csv", model)
     _write_hsrp(csv_dir / "hsrp.csv", model)
     _write_bgp(csv_dir / "bgp.csv", model)
+    _write_ports(csv_dir / "ports.csv", model)
 
     return csv_dir
 
@@ -106,6 +108,8 @@ def _write_interfaces(path: Path, model: NetworkModel) -> None:
         "vlan",
         "mode",
         "trunk_vlans",
+        "speed",
+        "duplex",
         "po_id",
         "po_members",
     )
@@ -122,6 +126,8 @@ def _write_interfaces(path: Path, model: NetworkModel) -> None:
             interface.vlan,
             interface.mode,
             ";".join(str(vlan_id) for vlan_id in interface.trunk_vlans),
+            interface.speed,
+            interface.duplex,
             interface.po_id,
             ";".join(interface.po_members),
         )
@@ -238,6 +244,11 @@ def _write_bgp(path: Path, model: NetworkModel) -> None:
         for peer in sorted(model.bgp, key=lambda peer: (peer.local_device, peer.vrf, peer.peer_ip))
     ]
     write_table(path, _BGP_HEADER, rows)
+
+
+def _write_ports(path: Path, model: NetworkModel) -> None:
+    """The per-port endpoint table; its rules live in `export/port_table.py`."""
+    write_table(path, PORT_TABLE_HEADER, [row.as_tuple() for row in build_port_rows(model)])
 
 
 def write_table(path: Path, header: tuple[str, ...], rows: Sequence[tuple[object, ...]]) -> None:

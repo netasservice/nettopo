@@ -15,6 +15,7 @@ from nettopo.model.entities import (
     HsrpRole,
     Interface,
     Link,
+    MacEntry,
     NetworkModel,
     StpBridge,
     StpPort,
@@ -62,6 +63,7 @@ def test_write_csv_tables_creates_every_table(tmp_path: Path) -> None:
         "stp.csv",
         "hsrp.csv",
         "bgp.csv",
+        "ports.csv",
     }
     assert {path.name for path in csv_dir.iterdir()} == expected
 
@@ -319,3 +321,32 @@ def test_stp_csv_carries_the_root_address_and_port_type(tmp_path: Path) -> None:
     assert row["root_device"] == ""
     assert row["root_mac"] == "aaaa.bbbb.9999"
     assert row["link_type"] == "P2p Edge"
+
+
+def test_interfaces_csv_carries_speed_and_duplex(tmp_path: Path) -> None:
+    model = _sample_model()
+    model.devices["sw1"].interfaces["Gi1/0/1"].speed = "a-1000"
+    model.devices["sw1"].interfaces["Gi1/0/1"].duplex = "a-full"
+    (row,) = _read_rows(write_csv_tables(model, tmp_path) / "interfaces.csv")
+    assert (row["speed"], row["duplex"]) == ("a-1000", "a-full")
+
+
+def test_ports_csv_has_one_row_per_learned_mac(tmp_path: Path) -> None:
+    model = _sample_model()
+    model.devices["sw1"].interfaces["Gi1/0/5"] = Interface(name="Gi1/0/5", vlan=10)
+    model.mac_entries = [
+        MacEntry("sw1", "0050.56a1.0001", 10, "Gi1/0/5", "dynamic"),
+        MacEntry("sw1", "0050.56a1.0002", 10, "Gi1/0/5", "dynamic"),
+    ]
+    rows = _read_rows(write_csv_tables(model, tmp_path) / "ports.csv")
+    assert [(row["interface"], row["mac"], row["vlan"]) for row in rows] == [
+        ("Gi1/0/1", "", ""),
+        ("Gi1/0/5", "0050.56a1.0001", "10"),
+        ("Gi1/0/5", "0050.56a1.0002", "10"),
+    ]
+    assert rows[0]["neighbor"] == "sw2"
+
+
+def test_ports_csv_neutralizes_formula_prefixed_cells(tmp_path: Path) -> None:
+    rows = _read_rows(write_csv_tables(_sample_model(), tmp_path) / "ports.csv")
+    assert rows[0]["description"] == "'=cmd|calc"

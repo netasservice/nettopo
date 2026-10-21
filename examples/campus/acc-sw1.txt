@@ -184,3 +184,49 @@ Interface           Role Sts Cost      Prio.Nbr Type
 Gi1/0/10             Desg FWD 4         128.10   P2p Edge
 Gi1/0/23             Desg FWD 4         128.23   P2p
 Gi1/0/24             Root FWD 4         128.24   P2p
+
+acc-sw1#show interfaces status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/5   pc-desk-101        connected    10         a-full a-1000 10/100/1000BaseTX
+Gi1/0/6   phone-desk-102     connected    10         a-full a-1000 10/100/1000BaseTX
+Gi1/0/7                      notconnect   10           auto   auto 10/100/1000BaseTX
+Gi1/0/8   spare              disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/10  esxi-host01 vmnic0 connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/23  acc-sw2 Gi1/0/23   connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/24  dist-sw1 Gi1/0/23  connected    trunk      a-full a-1000 10/100/1000BaseTX
+
+acc-sw1#show interfaces description
+Interface                      Status         Protocol Description
+Vl1                            admin down     down
+Vl99                           up             up       mgmt
+Gi1/0/5                        up             up       pc-desk-101
+Gi1/0/6                        up             up       phone-desk-102 (voice VLAN 20)
+Gi1/0/7                        down           down
+Gi1/0/8                        admin down     down     spare
+Gi1/0/10                       up             up       esxi-host01 vmnic0
+Gi1/0/23                       up             up       acc-sw2 Gi1/0/23
+Gi1/0/24                       up             up       uplink dist-sw1 Gi1/0/23
+
+acc-sw1#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0180.c200.0000    STATIC      CPU
+ All    ffff.ffff.ffff    STATIC      CPU
+  10    f8bc.1201.0101    DYNAMIC     Gi1/0/5
+  10    f8bc.1201.0102    DYNAMIC     Gi1/0/6
+  20    00eb.d5a1.0102    DYNAMIC     Gi1/0/6
+  30    0050.56a1.3001    DYNAMIC     Gi1/0/10
+  30    0050.56a1.3002    DYNAMIC     Gi1/0/10
+  10    0000.0c07.ac0a    DYNAMIC     Gi1/0/24
+  20    0000.0c07.ac14    DYNAMIC     Gi1/0/24
+  30    0000.0c07.ac1e    DYNAMIC     Gi1/0/24
+  10    00a1.b2c3.d001    DYNAMIC     Gi1/0/24
+  10    00a1.b2c3.d002    DYNAMIC     Gi1/0/24
+  10    f8bc.1201.0201    DYNAMIC     Gi1/0/24
+  30    0050.56a1.3003    DYNAMIC     Gi1/0/24
+Total Mac Addresses for this criterion: 15

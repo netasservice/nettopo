@@ -66,7 +66,7 @@ def test_parse_command_writes_every_csv_table(tmp_path: Path) -> None:
 
     assert exit_code == 0
     csv_dir = output_dir / "csv"
-    for name in ("devices.csv", "interfaces.csv", "neighbors.csv", "vlans.csv"):
+    for name in ("devices.csv", "interfaces.csv", "neighbors.csv", "vlans.csv", "ports.csv"):
         assert (csv_dir / name).exists()
 
 
@@ -275,6 +275,7 @@ def test_all_command_writes_every_view_and_every_csv_table(tmp_path: Path) -> No
         "stp.csv",
         "hsrp.csv",
         "bgp.csv",
+        "ports.csv",
     }
     # PROJECT_SPEC.md section 8's output/l2/ tree, in full.
     assert {path.name for path in (output_dir / "l2").iterdir()} == {

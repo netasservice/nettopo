@@ -331,3 +331,32 @@ def test_a_bgp_summary_settles_the_devices_own_router_id() -> None:
     model = build_network_model(FileDataSource(BGP_FIXTURES))
     assert model.devices["core-r1"].router_id == "10.255.0.1"
     assert model.devices["core-r2"].router_id == "10.255.0.2"
+
+
+def test_mac_and_arp_tables_reach_the_model_across_devices(tmp_path: Path) -> None:
+    """The access switch learns the MAC; the gateway, a different capture, holds the ARP."""
+    fixtures = Path(__file__).parent / "fixtures"
+    (tmp_path / "acc1.txt").write_text(
+        "acc1#show mac address-table\n"
+        + (fixtures / "mac_table" / "ios_show_mac_address_table.txt").read_text()
+    )
+    (tmp_path / "core1.txt").write_text(
+        "core1#show ip arp\n" + (fixtures / "arp" / "ios_show_ip_arp.txt").read_text()
+    )
+    model = build_network_model(FileDataSource(tmp_path))
+
+    assert {entry.device for entry in model.mac_entries} == {"acc1"}
+    assert len(model.mac_entries) == 5
+    assert {entry.device for entry in model.arp_entries} == {"core1"}
+    assert len(model.arp_entries) == 4
+
+
+def test_a_port_seen_only_in_the_mac_table_becomes_an_interface(tmp_path: Path) -> None:
+    fixtures = Path(__file__).parent / "fixtures"
+    (tmp_path / "acc1.txt").write_text(
+        "acc1#show mac address-table\n"
+        + (fixtures / "mac_table" / "ios_show_mac_address_table.txt").read_text()
+    )
+    interfaces = build_network_model(FileDataSource(tmp_path)).devices["acc1"].interfaces
+    assert set(interfaces) == {"Gi1/0/5", "Gi1/0/6", "Gi1/0/48", "Po1"}
+    assert interfaces["Po1"].type is InterfaceType.PORT_CHANNEL

@@ -75,6 +75,8 @@ class Interface:
     prefix_len: int | None = None
     vlan: int | None = None  # access VLAN, or the SVI number
     mode: str | None = None  # "access" | "trunk"
+    speed: str | None = None  # as `show interfaces status` prints it: "a-1000", "10G"
+    duplex: str | None = None  # "a-full", "full", "auto"
     trunk_vlans: list[int] = field(default_factory=list)
     po_id: int | None = None  # if this port is a member of a port-channel
     po_members: list[str] = field(default_factory=list)  # if this IS the port-channel (MLAG/LAG)
@@ -212,6 +214,27 @@ class Vlan:
 
 
 @dataclass
+class MacEntry:
+    """One endpoint row of a device's `show mac address-table`."""
+
+    device: str
+    mac: str  # normalized by `utils/mac.normalize_mac`
+    vlan: int
+    interface: str  # normalized; always a real port, never CPU/Router/sup-eth
+    entry_type: str  # "dynamic" | "static", as the device prints it, lowercased
+
+
+@dataclass
+class ArpEntry:
+    """One resolved row of a device's `show ip arp` (default VRF)."""
+
+    device: str
+    ip: str
+    mac: str  # normalized by `utils/mac.normalize_mac`
+    interface: str | None  # normalized; IOS leaves it blank on some entries
+
+
+@dataclass
 class NetworkModel:
     devices: dict[str, Device] = field(default_factory=dict)  # keyed by hostname
     links: list[Link] = field(default_factory=list)
@@ -219,6 +242,8 @@ class NetworkModel:
     stp: dict[int, StpVlan] = field(default_factory=dict)  # keyed by VLAN id
     hsrp: dict[tuple[int, int], HsrpGroup] = field(default_factory=dict)  # (vlan, group)
     bgp: list[BgpPeer] = field(default_factory=list)
+    mac_entries: list[MacEntry] = field(default_factory=list)
+    arp_entries: list[ArpEntry] = field(default_factory=list)
 
     def port_channel_name(self, hostname: str, interface_name: str) -> str | None:
         """The port-channel `interface_name` on `hostname` belongs to (or is), if any.

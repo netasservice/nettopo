@@ -42,6 +42,7 @@ _INTERFACE_PREFIXES: tuple[str, ...] = (
 )
 
 _SVI_NAME = re.compile(r"^Vl(?P<vlan_id>\d+)$")
+_DIGIT_RUNS = re.compile(r"\d+|\D+")
 
 
 def looks_like_interface(name: str) -> bool:
@@ -71,6 +72,19 @@ def svi_vlan(name: str) -> int | None:
     """
     match = _SVI_NAME.match(normalize(name))
     return int(match.group("vlan_id")) if match else None
+
+
+def interface_sort_key(name: str) -> tuple[tuple[int, int | str], ...]:
+    """A key that orders interface names the way a person reads them.
+
+    Plain string order puts `Gi1/0/10` before `Gi1/0/2`; splitting the name into digit
+    and non-digit runs and comparing the digit runs as numbers puts it after. Each run is
+    tagged (0 for text, 1 for a number) so a text run and a number run in the same
+    position never get compared directly, which Python would refuse.
+    """
+    return tuple(
+        (1, int(run)) if run.isdigit() else (0, run.lower()) for run in _DIGIT_RUNS.findall(name)
+    )
 
 
 def normalize(name: str) -> str:

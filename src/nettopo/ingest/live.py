@@ -52,14 +52,20 @@ _IOS_COMMANDS: tuple[str, ...] = (
     "show standby brief",
     "show etherchannel summary",
     "show ip bgp summary",
+    "show interfaces status",
+    "show interfaces description",
+    "show mac address-table",
+    "show ip arp",
 )
 
-# NX-OS differs in exactly two places, both verified rather than assumed:
+# NX-OS differs in exactly three places, all verified rather than assumed:
 #   - the bundle table is `show port-channel summary`. `parsing/etherchannel.py` picks its
 #     template from the prompt line rather than the platform, so this needs no plumbing.
 #   - `show standby brief` is dropped. NX-OS spells it `show hsrp brief`, ntc-templates
 #     ships no template for it and `parsing/hsrp.py` has no parser, so collecting it would
 #     only add a section nothing reads.
+#   - the interface status and description tables are spelled `show interface ...`, the
+#     NX-OS form and the only one its ntc-templates index entries match.
 # `show spanning-tree` stays even though ntc-templates has no NX-OS template for it:
 # `parsing/spanning_tree.py` parses that command with its own regexes.
 _NXOS_COMMANDS: tuple[str, ...] = (
@@ -72,6 +78,10 @@ _NXOS_COMMANDS: tuple[str, ...] = (
     "show spanning-tree",
     "show port-channel summary",
     "show ip bgp summary",
+    "show interface status",
+    "show interface description",
+    "show mac address-table",
+    "show ip arp",
 )
 
 _VERSION_COMMAND = "show version"

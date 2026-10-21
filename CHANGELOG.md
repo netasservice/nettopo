@@ -7,10 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-21
+
+### Added
+
+- **`ports.csv`: what is plugged into each port.** `nettopo parse` and `nettopo all` now
+  write a per-port endpoint table: device, interface, status (`up`/`down`/`admin-down`),
+  description, speed, duplex, learned MAC, its VLAN, its IP, and the CDP/LLDP neighbor
+  with its port and platform. One row per learned MAC.
+  - The IP is looked up in the ARP tables of every captured device, since the gateway
+    holding the ARP entry is rarely the switch that learned the MAC.
+  - Uplinks (a network-gear neighbor, a port-channel or a port-channel member) show only
+    their neighbor, so each endpoint appears once, on its access port.
+  - Ports behind an IP phone, AP, host or server still list every MAC.
+- **Four new commands parsed and collected**, for IOS/IOS-XE and NX-OS:
+  - `show mac address-table` (endpoint entries only; CPU, supervisor, peer-link and SVI
+    entries are dropped);
+  - `show ip arp` (default VRF);
+  - `show interfaces status`;
+  - `show interfaces description` (`show interface ...` on NX-OS).
+
+  `nettopo collect` sends them, so a collected capture is enough to build the table.
+- **`examples/campus` carries the new commands**, with PCs, an IP phone and VMs behind
+  the ESXi trunks, so `nettopo parse -i examples/campus` shows a populated `ports.csv`.
+
 ### Changed
 
+- **`interfaces.csv` is filled in.** Its `vlan` and `mode` columns, empty until now, come
+  from `show interfaces status`. The `description` column also reads
+  `show interfaces description`, so it no longer depends on the full `show interfaces`.
+  New `speed` and `duplex` columns.
+- **A port seen only in the MAC table is now listed in `interfaces.csv`**, even when no
+  interface command covered it.
 - **Project moved to the `netasservice` GitHub organization.** All repository, issue
   and wiki links now point at `github.com/netasservice/nettopo`.
+
+### Fixed
+
+- **An empty description in `show interfaces` no longer erases one** reported by another
+  command.
 
 ## [0.9.1] - 2026-08-20
 
