@@ -11,7 +11,7 @@ docs, see the [README](../README.md#usage).
 
 | Command | Status | Reads | Writes |
 |---|---|---|---|
-| `nettopo parse` | real | every capture | `output/csv/*.csv` |
+| `nettopo parse` | real | every capture | `output/csv/*.csv`, including the per-port `ports.csv` |
 | `nettopo l2` | real | CDP/LLDP, interfaces | `output/l2/*.drawio` |
 | `nettopo stp` | real | `show spanning-tree` | `output/stp/*.drawio`, `stp.csv` rows |
 | `nettopo hsrp` | real | `show standby brief` | `output/hsrp/*.drawio`, `hsrp.csv` rows |
@@ -34,9 +34,9 @@ flowchart LR
     views["views/<br/>l2, stp, hsrp, bgp"] --> model
     render["render/<br/>drawio, icons, legend"] --> views
     render --> model
-    export["export/<br/>csv_export"] --> views
+    export["export/<br/>csv_export, port_table"] --> views
     export --> model
-    model --> utils["utils/<br/>interfaces, hostnames, command_sections, paths"]
+    model --> utils["utils/<br/>interfaces, hostnames, mac, command_sections, paths"]
     parsing --> utils
     cli["cli.py<br/>argument parsing + orchestration only"] -. orchestrates .-> ingest
     cli -. orchestrates .-> parsing
@@ -52,9 +52,9 @@ flowchart LR
 | `model/` | `entities.py`: the normalized dataclasses and enums (`NetworkModel` and everything it contains). `grouping.py`: the STP fingerprint function that decides which VLANs render identically. `platforms.py`: the product-family table that turns a reported chassis into a `DeviceRole`. |
 | `views/` | One module per diagram (`l2`, `stp`, `hsrp`, `bgp`). Reads the model, returns a render-ready `views/diagram.py` `Diagram`. Never parses text or writes files. `diagram.py` also holds what the two per-VLAN views share: the `VlanDiagramGroup` they return and the `vlan_diagram_filename()` both output names are built from. |
 | `render/` | `drawio.py` (the only module importing N2G), `icons.py` (`DeviceRole` → Cisco icon, plus the palette and link styles), `legend.py` (the diagram's key). |
-| `export/` | `csv_export.py`: one CSV table per model entity. |
+| `export/` | `csv_export.py`: one CSV table per model entity, plus `ports.csv`. `port_table.py`: the join behind `ports.csv` (interfaces × MAC table × links × ARP), returning rows and writing nothing. |
 | `ingest/` | Data sources. `files.py` reads a capture directory and writes one; `inventory.py` reads the device list `collect` works from; `credentials.py` prompts for one run's credentials; `live.py` collects over SSH and is the only module that imports netmiko. |
-| `utils/` | Dependency-free shared services: `interfaces.py` (interface-name normalizer), `hostnames.py` (device-name normalizer), `command_sections.py` (the multi-command capture format, read and write), `paths.py` (the shared capture-directory default, path resolution, filename sanitization). |
+| `utils/` | Dependency-free shared services: `interfaces.py` (interface-name normalizer), `hostnames.py` (device-name normalizer), `mac.py` (MAC-address normalizer), `command_sections.py` (the multi-command capture format, read and write), `paths.py` (the shared capture-directory default, path resolution, filename sanitization). |
 | `cli.py` | `argparse` setup and per-command orchestration only — no parsing or rendering logic lives here. |
 
 ### Layering rule (Dependency Inversion)
@@ -427,7 +427,7 @@ command matches a pattern and returns just that command's output slice.
 | `show` command | Parser | Technique | Populates |
 |---|---|---|---|
 | `show version` | `parsing/version.py` | ntc-templates | hostname, `Device.platform/model/os/serial` |
-| `show ip interface brief`, `show interfaces` | `parsing/interfaces.py` | ntc-templates | `Device.interfaces` |
+| `show ip interface brief`, `show interfaces status`, `show interfaces description`, `show interfaces` | `parsing/interfaces.py` | ntc-templates (see below) | `Device.interfaces`, including `vlan`/`mode`/`speed`/`duplex` from the status table |
 | `show vlan brief` | `parsing/vlan.py` | ntc-templates | `NetworkModel.vlans` |
 | `show cdp neighbors detail` | `parsing/cdp.py` | ntc-templates + own regex (see below) | raw `Link`s (`discovery="cdp"`) |
 | `show lldp neighbors detail` | `parsing/lldp.py` | ntc-templates | raw `Link`s (`discovery="lldp"`, see below), plus the neighbor's chassis MAC (`Device.chassis_id`), which CDP never reports |
@@ -435,10 +435,43 @@ command matches a pattern and returns just that command's output slice.
 | `show spanning-tree` | `parsing/spanning_tree.py` | **own regexes** (see below) | `NetworkModel.stp` (`StpBridge`, `StpPort`) — and, when links are bundled, needs `show etherchannel summary` alongside it for the STP view to resolve `Po1` onto its members |
 | `show standby brief` | `parsing/hsrp.py` | ntc-templates | `NetworkModel.hsrp` (`HsrpGroup`, `HsrpMember`) |
 | `show ip bgp summary` | `parsing/bgp.py` | ntc-templates | `NetworkModel.bgp` (`BgpPeer`), plus `Device.asn` and `Device.router_id` — the summary's only writer |
+| `show mac address-table` (or legacy `show mac-address-table`) | `parsing/mac_table.py` | ntc-templates, multi-port lines dropped first (see below) | `NetworkModel.mac_entries` (`MacEntry`) — endpoint entries only |
+| `show ip arp` | `parsing/arp.py` | ntc-templates | `NetworkModel.arp_entries` (`ArpEntry`), default VRF, resolved entries only |
 
 All ntc-templates-backed parsers go through `parsing/_textfsm.py`, a thin typed wrapper
 around `ntc_templates.parse_output` — the one place the untyped `ntc_templates` import
 boundary exists.
+
+### How the four interface commands merge
+
+No single interface command is both complete and commonly captured. `show interfaces`
+has everything but is long enough that most captures omit it; `show interfaces status`
+has the access VLAN or `trunk`, speed and duplex but truncates the port name column to
+about 18 characters; `show interfaces description` has the full description; `show ip
+interface brief` has state and addresses. `parse_interfaces()` merges them by normalized
+name from least to most authoritative — ip brief, status, description, `show interfaces`
+— and the status table only fills fields still unknown, so a port reported `notconnect`
+there never overrides an "administratively down" from ip brief. An empty description in
+a later command never wipes a non-empty one from an earlier command, and NX-OS's `--`
+placeholder reads as empty.
+
+The status and description templates are looked up as `show interface ...`. ntc-templates
+matches IOS under either spelling but NX-OS only in the singular, so the singular is the
+one name that works for both.
+
+### Why the MAC-table parser edits its input before the template sees it
+
+A Catalyst line listing several ports (`20 0100.5e00.0001 STATIC Gi1/0/1, Gi1/0/2`) makes
+the shipped IOS template hit its own `Error` rule. That raises textfsm's `TextFSMError`,
+which is not a `ParsingException`, and the template returns nothing, so one multicast
+entry would lose the whole table. `parsing/mac_table.py` drops those lines first: a
+multi-port entry is multicast or flooding, never an endpoint, so nothing the port table
+needs is lost. `parsing/_textfsm.py` exports `TEMPLATE_ERRORS` so the parsers that guard a
+template run catch both exception types without importing textfsm themselves.
+
+The parser keeps endpoint entries only. Ports that aren't interface names (`CPU`,
+`Router`, `Drop`, `sup-eth1(R)`, NX-OS's `vPC Peer-Link`), SVIs (the switch's own routed
+MAC), and non-numeric VLANs (`All`, NX-OS gateway rows' `-`) are all dropped.
 
 ### Why the port-channel parser picks its template from the prompt line
 
@@ -861,6 +894,34 @@ draw.io reads both correctly: it writes `relative="-1"` on the target-end label 
 source end gets `relative="1"` (mxGraph parses the attribute as a number and any non-zero
 value is truthy), and its XML templates leave doubled semicolons in style strings. Both
 used to be normalized by a post-process that existed for one reason only — see below.
+
+### Why the port table lives in `export/`, and how it joins
+
+`ports.csv` answers "what is plugged into each port". It is a join, not an entity: one
+device's interfaces, the MAC table of the same device, the CDP/LLDP links in either
+direction, and the ARP tables of *every* device (the gateway holding an endpoint's ARP
+entry is rarely the switch that learned its MAC). Views return a `Diagram`, so a table
+does not belong among them. `export/` already depends on `views` + `model`, and
+`export/port_table.py` is a pure function from the model to rows, which `csv_export.py`
+writes like any other table, through the same formula-injection guard.
+
+The rule that keeps it readable is that **uplinks are reduced to their neighbor**. Every
+switch on the path to the core learns every endpoint's MAC, so listing what each port
+learned would put each PC on every uplink between it and the gateway. A port is an
+uplink when its neighbor's role is router, multilayer switch, switch or firewall, or it
+is a port-channel or a member of one. It gets one row naming the neighbor, and each
+endpoint then appears exactly once, on its access port. Phones, APs, hosts and servers,
+and neighbors whose role is unknown, do not make a port an uplink: the PC behind an IP
+phone, or the VMs behind an ESXi host's trunk, are exactly what the table is for.
+
+Two consequences of only one direction of each link surviving ingestion:
+- The neighbor index is built from both ends of every link.
+- `neighbor_platform` comes from the neighbor's `Device`, because a link stored from the
+  neighbor's side carries *this* device's platform in `remote_platform`.
+
+A port-channel has no links of its own (CDP/LLDP run on the members), so its row
+collects its members' neighbors. A member's far end is named by the remote bundle when
+the remote device is captured too, which collapses N adjacencies into one `core-sw2 Po1`.
 
 ### Why there is no Lucidchart export
 

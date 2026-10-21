@@ -1,0 +1,10 @@
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   Uplink to core-rt  connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/5   esxi-host03 vmnic0 connected    10         a-full a-1000 10/100/1000BaseTX
+Gi1/0/6   Phone + PC         connected    10         a-full  a-100 10/100/1000BaseTX
+Gi1/0/7                      notconnect   10           auto   auto 10/100/1000BaseTX
+Gi1/0/8   Spare              disabled     1            auto   auto 10/100/1000BaseTX
+Gi1/0/9                      err-disabled 10           auto   auto 10/100/1000BaseTX
+Gi1/0/24  Routed to WAN      connected    routed     a-full a-1000 10/100/1000BaseTX
+Po1       Uplink bundle      connected    trunk      a-full a-1000

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from nettopo.utils.interfaces import looks_like_interface, normalize, svi_vlan
+from nettopo.utils.interfaces import interface_sort_key, looks_like_interface, normalize, svi_vlan
 
 # Long-form input -> expected canonical output, one row per PROJECT_SPEC.md section 5.
 LONG_FORM_CASES = [
@@ -133,3 +133,21 @@ def test_does_not_mutate_numeric_suffix() -> None:
 )
 def test_svi_vlan_reads_the_vlan_out_of_an_svi_name(raw: str, expected: int | None) -> None:
     assert svi_vlan(raw) == expected
+
+
+def test_interface_sort_key_orders_port_numbers_numerically() -> None:
+    names = ["Gi1/0/10", "Vl10", "Gi1/0/2", "Gi1/0/1", "Po1", "Gi1/1/1", "Vl2"]
+    assert sorted(names, key=interface_sort_key) == [
+        "Gi1/0/1",
+        "Gi1/0/2",
+        "Gi1/0/10",
+        "Gi1/1/1",
+        "Po1",
+        "Vl2",
+        "Vl10",
+    ]
+
+
+def test_interface_sort_key_never_compares_text_with_a_number() -> None:
+    """A bare `1/1` (some switches print ports this way) must not raise a TypeError."""
+    assert sorted(["1/1", "mgmt0", "Eth1/1"], key=interface_sort_key) == ["Eth1/1", "mgmt0", "1/1"]

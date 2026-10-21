@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nettopo"
-version = "0.9.1"
+version = "0.10.0"
 description = "Generate draw.io network diagrams (L2, STP, HSRP, BGP) from saved Cisco show-command captures."
 readme = "README.md"
 license = { text = "MIT" }
@@ -70,6 +70,10 @@ mypy_path = "src"
 
 [[tool.mypy.overrides]]
 module = "ntc_templates.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "textfsm.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

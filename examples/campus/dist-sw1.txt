@@ -166,3 +166,28 @@ Interface           Role Sts Cost      Prio.Nbr Type
 Gi1/0/1              Root FWD 4         128.1    P2p
 Gi1/0/2              Altn BLK 4         128.2    P2p
 Gi1/0/23             Desg FWD 4         128.23   P2p
+
+dist-sw1#show interfaces status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   core-sw1           connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/2   core-sw2           connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/23  acc-sw1            connected    trunk        full   1000 10/100/1000BaseTX
+
+dist-sw1#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0180.c200.0000    STATIC      CPU
+ All    ffff.ffff.ffff    STATIC      CPU
+  10    f8bc.1201.0101    DYNAMIC     Gi1/0/23
+  10    f8bc.1201.0102    DYNAMIC     Gi1/0/23
+  20    00eb.d5a1.0102    DYNAMIC     Gi1/0/23
+  30    0050.56a1.3001    DYNAMIC     Gi1/0/23
+  30    0050.56a1.3002    DYNAMIC     Gi1/0/23
+  10    0000.0c07.ac0a    DYNAMIC     Gi1/0/1
+  20    0000.0c07.ac14    DYNAMIC     Gi1/0/1
+  30    0000.0c07.ac1e    DYNAMIC     Gi1/0/1

@@ -184,3 +184,40 @@ Interface           Role Sts Cost      Prio.Nbr Type
 Gi1/0/10             Desg FWD 4         128.10   P2p Edge
 Gi1/0/23             Altn BLK 4         128.23   P2p
 Gi1/0/24             Root FWD 4         128.24   P2p
+
+acc-sw2#show interfaces status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/5   pc-desk-201        connected    10         a-full a-1000 10/100/1000BaseTX
+Gi1/0/9                      err-disabled 10           auto   auto 10/100/1000BaseTX
+Gi1/0/10  esxi-host02 vmnic0 connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/23  acc-sw1 Gi1/0/23   connected    trunk      a-full a-1000 10/100/1000BaseTX
+Gi1/0/24  dist-sw2 Gi1/0/23  connected    trunk      a-full a-1000 10/100/1000BaseTX
+
+acc-sw2#show interfaces description
+Interface                      Status         Protocol Description
+Vl1                            admin down     down
+Vl99                           up             up       mgmt
+Gi1/0/5                        up             up       pc-desk-201
+Gi1/0/9                        down           down     pc-desk-202 (bpduguard)
+Gi1/0/10                       up             up       esxi-host02 vmnic0
+Gi1/0/23                       up             up       acc-sw1 Gi1/0/23
+Gi1/0/24                       up             up       uplink dist-sw2 Gi1/0/23
+
+acc-sw2#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0180.c200.0000    STATIC      CPU
+ All    ffff.ffff.ffff    STATIC      CPU
+  10    f8bc.1201.0201    DYNAMIC     Gi1/0/5
+  30    0050.56a1.3003    DYNAMIC     Gi1/0/10
+  10    0000.0c07.ac0a    DYNAMIC     Gi1/0/24
+  20    0000.0c07.ac14    DYNAMIC     Gi1/0/24
+  30    0000.0c07.ac1e    DYNAMIC     Gi1/0/24
+  10    00a1.b2c3.d001    DYNAMIC     Gi1/0/24
+  10    00a1.b2c3.d002    DYNAMIC     Gi1/0/24
+Total Mac Addresses for this criterion: 10

@@ -4,7 +4,8 @@ Runnable capture sets. Unlike `tests/fixtures/`, which holds the smallest input 
 exercises one parser, these are networks meant to be run end to end — they are the source
 of the diagrams in the [top-level README](../README.md#example-diagrams).
 
-`campus/` is the general-purpose one, exercising the L2, STP and HSRP views. The other two
+`campus/` is the general-purpose one, exercising the L2, STP and HSRP views and the
+per-port `ports.csv` table. The other two
 exist for a single shape the campus set cannot show: `hsrp-quad/` for an HSRP group with
 more than two members, and `bgp-edge/` for BGP, which the campus switches do not run.
 
@@ -26,6 +27,15 @@ between them, which is what makes `--group-mode strict` and `--group-mode topolo
 produce different groupings on this set. The core pair runs HSRP on VLANs 10, 20 and 30,
 aligned with those trees — each core switch is the active gateway for the VLANs it roots.
 The HSRP view never groups, so it writes one diagram per VLAN whatever the priorities are.
+
+The captures also carry the four commands behind `ports.csv` (`show interfaces status`,
+`show interfaces description`, `show mac address-table`, `show ip arp`). The access
+switches have endpoints that CDP does not report, so the diagrams are unchanged: on
+`acc-sw1`, a PC on `Gi1/0/5`, an IP phone with a PC behind it on `Gi1/0/6`, a disabled
+spare port, and two VMs on the `esxi-host01` trunk; on `acc-sw2`, a PC and an
+err-disabled port. Only the core switches hold ARP tables, so every IP in `ports.csv` is
+resolved across devices, and the distribution switches' MAC tables, which learn every
+endpoint, are hidden as uplinks.
 
 ```bash
 nettopo parse -i examples/campus -o ./output

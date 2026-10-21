@@ -187,3 +187,26 @@ Gi1/0/1              Root FWD 4         128.1    P2p
 Gi1/0/2              Altn BLK 4         128.2    P2p
 Gi1/0/22             Desg FWD 4         128.22   P2p
 Gi1/0/23             Desg FWD 4         128.23   P2p
+
+dist-sw2#show interfaces status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   core-sw1           connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/2   core-sw2           connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/22  acc-sw3 Gi1/0/24   connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/23  acc-sw2            connected    trunk        full   1000 10/100/1000BaseTX
+
+dist-sw2#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0180.c200.0000    STATIC      CPU
+ All    ffff.ffff.ffff    STATIC      CPU
+  10    f8bc.1201.0201    DYNAMIC     Gi1/0/23
+  30    0050.56a1.3003    DYNAMIC     Gi1/0/23
+  10    0000.0c07.ac0a    DYNAMIC     Gi1/0/1
+  20    0000.0c07.ac14    DYNAMIC     Gi1/0/1
+  30    0000.0c07.ac1e    DYNAMIC     Gi1/0/1

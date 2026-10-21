@@ -34,12 +34,14 @@ from nettopo.model.entities import (
     StpVlan,
 )
 from nettopo.model.platforms import classify_platform
+from nettopo.parsing.arp import parse_arp
 from nettopo.parsing.bgp import parse_bgp
 from nettopo.parsing.cdp import parse_cdp
 from nettopo.parsing.etherchannel import PortChannelCapture, parse_port_channels
 from nettopo.parsing.hsrp import parse_hsrp
 from nettopo.parsing.interfaces import interface_type, parse_interfaces
 from nettopo.parsing.lldp import parse_lldp
+from nettopo.parsing.mac_table import parse_mac_table
 from nettopo.parsing.spanning_tree import parse_spanning_tree
 from nettopo.parsing.version import parse_version
 from nettopo.parsing.vlan import parse_vlans
@@ -172,6 +174,14 @@ def _populate_source_devices(
 
         for vlan in parse_vlans(capture.raw_text, platform=platform):
             model.vlans.setdefault(vlan.vlan_id, vlan)
+
+        mac_entries = parse_mac_table(hostname, capture.raw_text, platform=platform)
+        model.mac_entries.extend(mac_entries)
+        # A port can appear in the MAC table without any interface command covering it
+        # (a capture need not include every command); the port table still owes it a row.
+        for mac_entry in mac_entries:
+            _get_or_create_interface(device, mac_entry.interface)
+        model.arp_entries.extend(parse_arp(hostname, capture.raw_text, platform=platform))
 
         for stp_capture in parse_spanning_tree(hostname, capture.raw_text):
             stp_vlan = model.stp.setdefault(stp_capture.vlan, StpVlan(vlan=stp_capture.vlan))

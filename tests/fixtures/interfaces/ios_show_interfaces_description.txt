@@ -1,0 +1,9 @@
+Interface                      Status         Protocol Description
+Vl1                            admin down     down
+Vl10                           up             up       Users VLAN gateway
+Gi1/0/1                        up             up       Uplink to core-rtr
+Gi1/0/5                        up             up       esxi-host03 vmnic0 (prod cluster)
+Gi1/0/6                        up             up       Phone + PC desk 12
+Gi1/0/7                        down           down
+Gi1/0/8                        admin down     down     Spare
+Gi1/0/24                       up             up       Routed to WAN

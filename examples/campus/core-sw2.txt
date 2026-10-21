@@ -231,3 +231,42 @@ Interface           Role Sts Cost      Prio.Nbr Type
 Gi1/0/3              Desg FWD 4         128.3    P2p
 Gi1/0/4              Desg FWD 4         128.4    P2p
 Po1                  Root FWD 3         128.664  P2p
+
+core-sw2#show interfaces status
+
+Port      Name               Status       Vlan       Duplex  Speed Type
+Gi1/0/1   core peer Po1      connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/2   core peer Po1      connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/3   dist-sw1           connected    trunk        full   1000 10/100/1000BaseTX
+Gi1/0/4   dist-sw2           connected    trunk        full   1000 10/100/1000BaseTX
+Po1       core peer          connected    trunk        full   1000
+
+core-sw2#show mac address-table
+          Mac Address Table
+-------------------------------------------
+
+Vlan    Mac Address       Type        Ports
+----    -----------       --------    -----
+ All    0100.0ccc.cccc    STATIC      CPU
+ All    0180.c200.0000    STATIC      CPU
+ All    ffff.ffff.ffff    STATIC      CPU
+  10    f8bc.1201.0101    DYNAMIC     Gi1/0/3
+  10    f8bc.1201.0102    DYNAMIC     Gi1/0/3
+  20    00eb.d5a1.0102    DYNAMIC     Gi1/0/3
+  30    0050.56a1.3001    DYNAMIC     Gi1/0/3
+  30    0050.56a1.3002    DYNAMIC     Gi1/0/3
+  10    f8bc.1201.0201    DYNAMIC     Gi1/0/4
+  30    0050.56a1.3003    DYNAMIC     Gi1/0/4
+  10    00a1.b2c3.d001    DYNAMIC     Po1
+
+core-sw2#show ip arp
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  10.10.10.3               -   00a1.b2c3.d002  ARPA   Vlan10
+Internet  10.10.10.2               1   00a1.b2c3.d001  ARPA   Vlan10
+Internet  10.10.10.101             3   f8bc.1201.0101  ARPA   Vlan10
+Internet  10.10.10.102             0   f8bc.1201.0102  ARPA   Vlan10
+Internet  10.10.10.201             7   f8bc.1201.0201  ARPA   Vlan10
+Internet  10.10.20.102             1   00eb.d5a1.0102  ARPA   Vlan20
+Internet  10.10.30.11              4   0050.56a1.3001  ARPA   Vlan30
+Internet  10.10.30.12              4   0050.56a1.3002  ARPA   Vlan30
+Internet  10.10.30.13              2   0050.56a1.3003  ARPA   Vlan30

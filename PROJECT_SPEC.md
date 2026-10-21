@@ -55,6 +55,9 @@ returns 404). No rename needed for the v0.1.0 release.
 - STP and HSRP: **per-VLAN diagrams** and **two grouping modes** (see §6).
 - draw.io output with **Cisco icons** per device role.
 - **CSV export** of every intermediate table (neighbors, VLANs, STP, HSRP, BGP).
+- A **per-port endpoint table** (`ports.csv`): each port's state, description, learned
+  MACs, CDP/LLDP neighbor, endpoint VLAN and IP (joined from the ARP tables of every
+  captured device).
 - Bulk generation into a structured `output/` tree (e.g. `output/stp/`).
 
 ### Explicitly out of scope (v1) — YAGNI
@@ -71,6 +74,8 @@ returns 404). No rename needed for the v0.1.0 release.
   matching what N2G does today.
 - BGP route tables, policies, communities, route-reflector modeling. v1 is the
   **session graph only**.
+- ARP tables outside the default VRF (`show ip arp vrf ...`). The NX-OS `vrf all` form
+  prints one header per context, which the shipped template rejects.
 - BGP `peer_device` resolution (peer IP → hostname). Left as `None` in v1, and `bgp.csv`
   reports it empty on every row. The `bgp` **view** does match a peer address against the
   interface addresses the model already holds, so that one session between two captured
@@ -119,9 +124,11 @@ nettopo/
 │       │   ├── lldp.py
 │       │   ├── spanning_tree.py
 │       │   ├── hsrp.py
-│       │   ├── interfaces.py  # show ip interface brief / show interfaces / show run interface
+│       │   ├── interfaces.py  # show ip interface brief / interfaces status / description / show interfaces
 │       │   ├── etherchannel.py  # show etherchannel summary / show port-channel summary
 │       │   ├── vlan.py
+│       │   ├── mac_table.py   # show mac address-table (endpoint entries only)
+│       │   ├── arp.py         # show ip arp (default VRF)
 │       │   ├── bgp.py
 │       │   └── version.py     # platform/model/os detection
 │       ├── model/             # the normalized data model + grouping logic
@@ -143,12 +150,14 @@ nettopo/
 │       │   └── legend.py      # the diagram's key, drawn from the same styles
 │       ├── export/            # CSV writers
 │       │   ├── __init__.py
-│       │   └── csv_export.py
+│       │   ├── csv_export.py
+│       │   └── port_table.py  # the MAC/ARP/neighbor join behind ports.csv (rows, no I/O)
 │       └── utils/
 │           ├── __init__.py
 │           ├── command_sections.py  # the capture format: split it, and write it
 │           ├── hostnames.py   # THE device-name normalizer (central service)
 │           ├── interfaces.py  # THE interface-name normalizer (central service)
+│           ├── mac.py         # THE MAC-address normalizer (central service)
 │           └── paths.py       # capture-dir default, path resolution, filename sanitization
 └── tests/
     ├── fixtures/              # anonymized real captures used as parser inputs
@@ -204,9 +213,11 @@ rest of the pipeline is unchanged.
   rest of the command set, which reaches the model as `Capture.platform_hint` — the field's
   reason for existing. IOS-XE maps to `cisco_ios`: ntc-templates ships no `cisco_xe`
   platform, so that netmiko-only string must never reach a template lookup.
-- **Command set:** NX-OS differs in exactly two places — `show port-channel summary`
-  replaces the etherchannel form, and `show standby brief` is dropped because NX-OS spells
-  it `show hsrp brief`, for which there is no template and no parser.
+- **Command set:** NX-OS differs in exactly three places — `show port-channel summary`
+  replaces the etherchannel form, `show standby brief` is dropped because NX-OS spells
+  it `show hsrp brief`, for which there is no template and no parser, and the interface
+  status/description tables are sent as `show interface ...`, the NX-OS spelling and the
+  only one its ntc-templates entries match.
 - **Inventory:** a flat list of hostnames or IPs, one device per line in a plain text
   file, with `#` comments. No YAML, no groups, no variables, no credentials — see §2.
 - **Failure policy and credentials:** see §11.
@@ -218,6 +229,7 @@ rest of the pipeline is unchanged.
 | identity | `show version` |
 | L2 | `show cdp neighbors detail`, `show lldp neighbors detail`, `show etherchannel summary` (IOS/IOS-XE) or `show port-channel summary` (NX-OS) |
 | L3/VLAN | `show ip interface brief`, `show interfaces`, `show vlan brief` |
+| Ports | `show interfaces status` and `show interfaces description` (NX-OS: `show interface ...`) for VLAN/trunk, speed, duplex and the full description; `show mac address-table` for the endpoints each port learned; `show ip arp` for their IPs. The ARP table usually lives on the gateway, not the access switch, so the gateway's capture is what fills the IP column. Default VRF only |
 | STP | `show spanning-tree` (per-VLAN Rapid-PVST), **plus** the L2 discovery commands: spanning-tree output carries a device's own bridge and port states but never names the device on the other end of a port, so the STP view takes its links from the CDP/LLDP topology. `show etherchannel summary` is required whenever links are bundled — spanning-tree names the port-channel (`Po1`) while CDP/LLDP name its members (`Gi1/0/1`), and only the bundle table joins the two. `show lldp neighbors detail` additionally lets an out-of-capture root bridge be identified, since its chassis address is the only thing that can be matched against the reported root address |
 | HSRP | `show standby brief` — its shipped template captures every column the model needs (interface, group, priority, preempt, state, virtual IP), so the per-group detail form `show standby` is not read |
 | BGP | `show ip bgp summary` |
@@ -348,6 +360,8 @@ class Interface:
     prefix_len: int | None = None
     vlan: int | None = None                # access VLAN, or the SVI number
     mode: str | None = None                # "access" | "trunk"
+    speed: str | None = None               # as `show interfaces status` prints it: "a-1000"
+    duplex: str | None = None              # "a-full", "full", "auto"
     trunk_vlans: list[int] = field(default_factory=list)
     po_id: int | None = None               # if this port is a member of a port-channel
     po_members: list[str] = field(default_factory=list)  # if this IS the port-channel (MLAG/LAG)
@@ -457,6 +471,23 @@ class Vlan:
 
 
 @dataclass
+class MacEntry:
+    device: str
+    mac: str                               # normalized: "0050.56a1.0001"
+    vlan: int
+    interface: str                         # a real port; CPU/Router/sup-eth/SVI entries are dropped
+    entry_type: str                        # "dynamic" | "static"
+
+
+@dataclass
+class ArpEntry:
+    device: str
+    ip: str
+    mac: str                               # normalized; Incomplete entries are dropped
+    interface: str | None
+
+
+@dataclass
 class NetworkModel:
     devices: dict[str, Device] = field(default_factory=dict)          # keyed by hostname
     links: list[Link] = field(default_factory=list)
@@ -464,7 +495,13 @@ class NetworkModel:
     stp: dict[int, StpVlan] = field(default_factory=dict)             # keyed by VLAN id
     hsrp: dict[tuple[int, int], HsrpGroup] = field(default_factory=dict)  # (vlan, group)
     bgp: list[BgpPeer] = field(default_factory=list)
+    mac_entries: list[MacEntry] = field(default_factory=list)
+    arp_entries: list[ArpEntry] = field(default_factory=list)
 ```
+
+A port seen only in a MAC table (no interface command covered it) is registered as an
+`Interface` anyway, the same on-demand rule port-channel members follow, so the port
+table still owes it a row.
 
 `NetworkModel.hsrp` is keyed by `(vlan, group)`, so a group configured on a routed port or
 a subinterface has no key to live under: `parsing/hsrp.py` skips it with a warning. That is
@@ -605,6 +642,32 @@ parsing vs rendering). One table per entity: `devices.csv`, `interfaces.csv`,
 `neighbors.csv`, `vlans.csv`, `stp.csv`, `hsrp.csv`, `bgp.csv`. STP CSV includes both base
 and effective priority.
 
+### The port table — `export/port_table.py`
+
+`ports.csv` is the one table that is a join rather than an entity: "what is plugged into
+each port". `export/port_table.py` builds its rows from the model (no I/O) and
+`csv_export.py` writes them. It lives in `export/` rather than `views/` because it is a
+table, not a `Diagram`. Columns: `device, interface, status, description, speed, duplex,
+mac, vlan, ip, neighbor, neighbor_interface, neighbor_platform`.
+
+- Every interface of every captured device gets at least one row, sorted by device and
+  then in natural interface order (`Gi1/0/2` before `Gi1/0/10`).
+- **One row per learned MAC.** The port's columns repeat on each of its rows — a CSV cannot
+  merge cells, and repeating them keeps every row filterable on its own.
+- **Uplinks are reduced to their neighbor.** A port whose CDP/LLDP neighbor is a router,
+  multilayer switch, switch or firewall, a port-channel, or a port-channel member gets one
+  row with the neighbor and no MACs: those MACs belong to endpoints behind the neighbor,
+  each of which already has a row on its own access port. A port-channel reports its
+  members' neighbors, named by the remote bundle when that device is captured too.
+- A phone, AP, host, server or **unknown** neighbor does not make a port an uplink, so the
+  PC behind an IP phone is still listed — with the phone repeated as neighbor on each row.
+- `status` is `up`, `down` or `admin-down`. `vlan` is the VLAN the MAC was learned in; a
+  row without a MAC shows the port's access VLAN, or `trunk`.
+- `ip` comes from the ARP tables of *every* captured device, matched on the normalized
+  MAC; several addresses are `;`-joined in numeric order.
+- `neighbor_platform` is read from the neighbor's `Device`, not `Link.remote_platform`,
+  which describes the other end when the link was stored from the neighbor's side.
+
 ### The collection report — `export/collect_report.py`
 
 `collect` writes one more CSV, and it is not part of the output tree above: it goes to the
@@ -622,6 +685,7 @@ output/
 ├── csv/
 │   ├── devices.csv
 │   ├── neighbors.csv
+│   ├── ports.csv
 │   └── ...
 ├── l2/
 │   ├── l2_full.drawio

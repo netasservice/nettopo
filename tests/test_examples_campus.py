@@ -6,7 +6,9 @@ else would fail if an example capture were edited or a view's output changed sha
 the section would quietly become fiction. These tests assert the handful of facts the
 README states outright: the two node/link counts, the STP root and blocked ports of the
 two distinct trees, the dashed uncaptured switch, the HSRP gateway pair and the roles and
-priorities on its links, and what each `--group-mode` writes for the STP view.
+priorities on its links, and what each `--group-mode` writes for the STP view. The last
+tests cover `ports.csv`: endpoints found on their access port and resolved to an IP
+through the cores' ARP tables, and uplinks reduced to their neighbor.
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from nettopo.export.port_table import PortRow, build_port_rows
 from nettopo.ingest.files import FileDataSource
 from nettopo.ingest.model_builder import build_network_model
 from nettopo.model.entities import NetworkModel
@@ -184,3 +187,46 @@ def test_hsrp_writes_one_diagram_per_vlan_with_its_own_gateway_address(
         "VLAN 20 group 20\n10.10.20.1",
         "VLAN 30 group 30\n10.10.30.1",
     ]
+
+
+def _port_rows(campus: NetworkModel, device: str, interface: str) -> list[PortRow]:
+    return [
+        row for row in build_port_rows(campus) if (row.device, row.interface) == (device, interface)
+    ]
+
+
+def test_ports_table_finds_the_phone_and_the_pc_behind_it(campus: NetworkModel) -> None:
+    rows = _port_rows(campus, "acc-sw1", "Gi1/0/6")
+    assert [(row.mac, row.vlan, row.ip) for row in rows] == [
+        ("f8bc.1201.0102", 10, "10.10.10.102"),
+        ("00eb.d5a1.0102", 20, "10.10.20.102"),
+    ]
+
+
+def test_ports_table_lists_vms_on_the_esxi_trunk_with_the_host_as_neighbor(
+    campus: NetworkModel,
+) -> None:
+    rows = _port_rows(campus, "acc-sw1", "Gi1/0/10")
+    assert [(row.mac, row.ip) for row in rows] == [
+        ("0050.56a1.3001", "10.10.30.11"),
+        ("0050.56a1.3002", "10.10.30.12"),
+    ]
+    assert {row.neighbor for row in rows} == {"esxi-host01"}
+
+
+def test_ports_table_shows_each_endpoint_only_on_its_access_port(campus: NetworkModel) -> None:
+    """Every switch on the path learns a PC's MAC; only the access port lists it."""
+    rows = build_port_rows(campus)
+    assert [(row.device, row.interface) for row in rows if row.mac == "f8bc.1201.0201"] == [
+        ("acc-sw2", "Gi1/0/5")
+    ]
+
+
+def test_ports_table_reduces_uplinks_to_their_neighbor(campus: NetworkModel) -> None:
+    (row,) = _port_rows(campus, "core-sw1", "Po1")
+    assert (row.mac, row.neighbor, row.neighbor_interface) == (None, "core-sw2", "Po1")
+
+
+def test_ports_table_reports_disabled_and_err_disabled_ports(campus: NetworkModel) -> None:
+    assert _port_rows(campus, "acc-sw1", "Gi1/0/8")[0].status == "admin-down"
+    assert _port_rows(campus, "acc-sw2", "Gi1/0/9")[0].status == "down"

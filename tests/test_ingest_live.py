@@ -90,6 +90,9 @@ def test_nxos_uses_the_port_channel_command_and_drops_show_standby(
     assert "show port-channel summary" in sent
     assert "show etherchannel summary" not in sent
     assert "show standby brief" not in sent
+    assert "show interface status" in sent
+    assert "show interface description" in sent
+    assert "show interfaces status" not in sent
 
 
 def test_the_identity_comes_from_the_device_not_the_inventory(fake_netmiko: FakeNetmiko) -> None:
